@@ -26,14 +26,18 @@ class AddTaskOptions(discord.ui.View):
                 due = datetime.strptime(self.task.due.datetime, "%Y-%m-%dT%H:%M:%S")
             elif self.task.due.date:
                 due = datetime.strptime(self.task.due.date, "%Y-%m-%d")
+                # Make It End Of Day
+                due = due.replace(hour=23, minute=59, second=59)
             else:
                 # I dont think I want to handle this case as it should not happen.
                 # Either need to log a warning or do nothing, just not error
                 pass
         embed = discord.Embed(
-            description=f"{task_name}\n`{self.task.id}`\n{self.task.description}",
+            description=f"**{task_name}**\n`{self.task.id}`"
+                        f"{(' | Due:' + discord.utils.format_dt(due, 'R')) if due else ''}\n{self.task.description}",
             color=56908,
             timestamp=due,
+            url=self.task.url
         )
         embed.set_author(name="Task Created")
         embed.set_footer(text="Due Date" if due else None)
@@ -86,7 +90,13 @@ async def todo(ctx: discord.ApplicationContext, task: discord.Option(str, descri
     name="Mark As ToDo",
 )
 async def mark_as_todo(ctx: discord.ApplicationContext, message: discord.Message):
-    short_msg = ((message.content[:min(len(message.content), 100)] + "... ") if message.content else "")
+    short_msg = ""
+    if message.content:
+        if len(message.content) >= 100:
+            short_msg = message.content[:97] + "..."
+        else:
+            short_msg = message.content
+        short_msg += " | "
     # This Link Should Work For All Discord Messages On All Devices But It Is Not Guaranteed
     # "@me" Is The Link For DM Channels Whereas This Is Guild ID Otherwise
     short_msg += (f"[Discord Jump](https://canary.discord.com/channels/{message.guild.id if message.guild else '@me'}"

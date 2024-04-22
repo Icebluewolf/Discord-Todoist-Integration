@@ -1,5 +1,6 @@
 import discord
 import os
+from datetime import datetime
 
 from todoist_api_python.api_async import TodoistAPIAsync
 from todoist_api_python.models import Task
@@ -8,43 +9,59 @@ bot = discord.Bot()
 api = TodoistAPIAsync(os.getenv('todoist_token'))
 
 
-class AddDesc(discord.ui.Modal):
-    def __init__(self, task: Task):
-        super().__init__(title="Set Description")
-        self.add_item(discord.ui.InputText(label="Enter Description", min_length=1))
-        self.task = task
-
-    async def callback(self, interaction: discord.Interaction):
-        await api.update_task(task_id=self.task.id, description=self.children[0].value.strip())
-        self.task.description = self.children[0].value.strip()
-        await interaction.response.edit_message(content="edited")
-
-
 class AddTaskOptions(discord.ui.View):
     def __init__(self, task: Task, **kwargs):
         super().__init__(**kwargs)
         self.task = task
 
-    @discord.ui.button(label="Add Description", style=discord.ButtonStyle.blurple)
+    @discord.ui.button(label="Add Info", style=discord.ButtonStyle.blurple)
     async def add_desc(self, button: discord.ui.Button, interaction: discord.Interaction):
-        await interaction.response.send_modal(AddDesc(task=self.task))
+        await interaction.response.send_modal(AddDesc(self.task, self))
 
     async def create_embed(self):
         task_name = self.task.content if len(self.task.content) < 256 else (self.task.content[:253] + "...")
+        due = None
+        if self.task.due:
+            if self.task.due.datetime:
+                due = datetime.strptime(self.task.due.datetime, "%Y-%m-%dT%H:%M:%S")
+            elif self.task.due.date:
+                due = datetime.strptime(self.task.due.date, "%Y-%m-%d")
+            else:
+                # I dont think I want to handle this case as it should not happen.
+                # Either need to log a warning or do nothing, just not error
+                pass
         embed = discord.Embed(
             description=f"{task_name}\n`{self.task.id}`\n{self.task.description}",
             color=56908,
-            timestamp=self.task.due,
+            timestamp=due,
         )
         embed.set_author(name="Task Created")
-        embed.set_footer(text="Due Date")
+        embed.set_footer(text="Due Date" if due else None)
         return embed
+
+
+class AddDesc(discord.ui.Modal):
+    def __init__(self, task: Task, view: AddTaskOptions):
+        super().__init__(title="Set Additional Info")
+        self.add_item(discord.ui.InputText(label="Enter Description", required=False))
+        self.add_item(discord.ui.InputText(label="Enter Due Date", required=False, placeholder="IE: tomorrow at 12:00"))
+        self.task = task
+        self.parent_view = view
+
+    async def callback(self, interaction: discord.Interaction):
+        response = await api.update_task(task_id=self.task.id, description=self.children[0].value.strip(),
+                                         due_string=self.children[1].value.strip())
+        response = Task.from_dict(response)
+        self.task.description = self.children[0].value.strip()
+        self.task.due = response.due
+        await interaction.response.edit_message(embed=await self.parent_view.create_embed())
 
 
 @bot.slash_command(
     integration_types={discord.IntegrationType.user_install},
 )
 async def update(ctx: discord.ApplicationContext):
+    # Currently Has No Effect
     try:
         projects = await api.get_projects()
         await ctx.respond(projects)
@@ -70,6 +87,8 @@ async def todo(ctx: discord.ApplicationContext, task: discord.Option(str, descri
 )
 async def mark_as_todo(ctx: discord.ApplicationContext, message: discord.Message):
     short_msg = ((message.content[:min(len(message.content), 100)] + "... ") if message.content else "")
+    # This Link Should Work For All Discord Messages On All Devices But It Is Not Guaranteed
+    # "@me" Is The Link For DM Channels Whereas This Is Guild ID Otherwise
     short_msg += (f"[Discord Jump](https://canary.discord.com/channels/{message.guild.id if message.guild else '@me'}"
                   f"/{message.channel.id}/{message.id})")
     try:

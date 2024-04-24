@@ -50,23 +50,31 @@ class AddDesc(discord.ui.Modal):
         self.add_item(discord.ui.InputText(label="Enter Description", required=False, value=task.description))
         self.add_item(discord.ui.InputText(label="Enter Due Date", required=False, placeholder="IE: tomorrow at "
                                                                                                "12:00",
-                                           value=task.due.string))
+                                           value=task.due.string if task.due else None))
         self.task = task
         self.parent_view = view
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        if self.children[1].value.strip():
+            due_string = self.children[1].value.strip()
+        else:
+            due_string = "no due date"
+
         response = await api.update_task(task_id=self.task.id, description=self.children[0].value.strip(),
-                                         due_string=self.children[1].value.strip())
+                                         due_string=due_string)
         response = Task.from_dict(response)
         self.task.description = self.children[0].value.strip()
         self.task.due = response.due
-        await interaction.response.edit_message(embed=await self.parent_view.create_embed())
+        await interaction.followup.edit_message(self.parent_view.message.id, embed=await
+        self.parent_view.create_embed())
 
 
 @bot.slash_command(
     integration_types={discord.IntegrationType.user_install},
 )
 async def update(ctx: discord.ApplicationContext):
+    await ctx.defer()
     # Currently Has No Effect
     try:
         projects = await api.get_projects()
@@ -79,6 +87,7 @@ async def update(ctx: discord.ApplicationContext):
     integration_types={discord.IntegrationType.user_install},
 )
 async def todo(ctx: discord.ApplicationContext, task: discord.Option(str, description="The Task To Complete")):
+    await ctx.defer()
     try:
         response = await api.add_task(content=task)
         view = AddTaskOptions(response)
@@ -102,6 +111,7 @@ async def mark_as_todo(ctx: discord.ApplicationContext, message: discord.Message
     # This Link Should Work For All Discord Messages On All Devices But It Is Not Guaranteed
     # TODO: The Jump URL Is Broken In The Current Dev Version Of Pycord
     short_msg += f"[Discord Jump]({message.jump_url})"
+    await ctx.defer()
     try:
         response = await api.add_task(content=short_msg)
         view = AddTaskOptions(response)

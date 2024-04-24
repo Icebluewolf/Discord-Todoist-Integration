@@ -34,7 +34,7 @@ class AddTaskOptions(discord.ui.View):
                 pass
         embed = discord.Embed(
             description=f"**{task_name}**\n`{self.task.id}`"
-                        f"{(' | Due:' + discord.utils.format_dt(due, 'R')) if due else ''}\n{self.task.description}",
+                        f"{(' | Due: ' + discord.utils.format_dt(due, 'R')) if due else ''}\n\n{self.task.description}",
             color=56908,
             timestamp=due,
             url=self.task.url
@@ -47,8 +47,10 @@ class AddTaskOptions(discord.ui.View):
 class AddDesc(discord.ui.Modal):
     def __init__(self, task: Task, view: AddTaskOptions):
         super().__init__(title="Set Additional Info")
-        self.add_item(discord.ui.InputText(label="Enter Description", required=False))
-        self.add_item(discord.ui.InputText(label="Enter Due Date", required=False, placeholder="IE: tomorrow at 12:00"))
+        self.add_item(discord.ui.InputText(label="Enter Description", required=False, value=task.description))
+        self.add_item(discord.ui.InputText(label="Enter Due Date", required=False, placeholder="IE: tomorrow at "
+                                                                                               "12:00",
+                                           value=task.due.string))
         self.task = task
         self.parent_view = view
 
@@ -98,9 +100,8 @@ async def mark_as_todo(ctx: discord.ApplicationContext, message: discord.Message
             short_msg = message.content
         short_msg += " | "
     # This Link Should Work For All Discord Messages On All Devices But It Is Not Guaranteed
-    # "@me" Is The Link For DM Channels Whereas This Is Guild ID Otherwise
-    short_msg += (f"[Discord Jump](https://canary.discord.com/channels/{message.guild.id if message.guild else '@me'}"
-                  f"/{message.channel.id}/{message.id})")
+    # TODO: The Jump URL Is Broken In The Current Dev Version Of Pycord
+    short_msg += f"[Discord Jump]({message.jump_url})"
     try:
         response = await api.add_task(content=short_msg)
         view = AddTaskOptions(response)

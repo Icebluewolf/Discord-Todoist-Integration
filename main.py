@@ -9,6 +9,22 @@ bot = discord.Bot()
 api = TodoistAPIAsync(os.getenv('todoist_token'))
 
 
+async def get_due_datetime(task: Task) -> datetime | None:
+    due = None
+    if task.due:
+        if task.due.datetime:
+            due = datetime.strptime(task.due.datetime, "%Y-%m-%dT%H:%M:%S")
+        elif task.due.date:
+            due = datetime.strptime(task.due.date, "%Y-%m-%d")
+            # Make It End Of Day
+            due = due.replace(hour=23, minute=59, second=59)
+        else:
+            # I dont think I want to handle this case as it should not happen.
+            # Either need to log a warning or do nothing, just not error
+            pass
+    return due
+
+
 class AddTaskOptions(discord.ui.View):
     def __init__(self, task: Task, **kwargs):
         super().__init__(**kwargs)
@@ -20,18 +36,7 @@ class AddTaskOptions(discord.ui.View):
 
     async def create_embed(self):
         task_name = self.task.content if len(self.task.content) < 256 else (self.task.content[:253] + "...")
-        due = None
-        if self.task.due:
-            if self.task.due.datetime:
-                due = datetime.strptime(self.task.due.datetime, "%Y-%m-%dT%H:%M:%S")
-            elif self.task.due.date:
-                due = datetime.strptime(self.task.due.date, "%Y-%m-%d")
-                # Make It End Of Day
-                due = due.replace(hour=23, minute=59, second=59)
-            else:
-                # I dont think I want to handle this case as it should not happen.
-                # Either need to log a warning or do nothing, just not error
-                pass
+        due = await get_due_datetime(self.task)
         embed = discord.Embed(
             description=f"**{task_name}**\n`{self.task.id}`"
                         f"{(' | Due: ' + discord.utils.format_dt(due, 'R')) if due else ''}\n\n{self.task.description}",
@@ -75,12 +80,30 @@ class AddDesc(discord.ui.Modal):
 )
 async def update(ctx: discord.ApplicationContext):
     await ctx.defer()
-    # Currently Has No Effect
-    try:
-        projects = await api.get_projects()
-        await ctx.respond(projects)
-    except Exception as error:
-        await ctx.respond(error)
+    tasks = await api.get_tasks()
+    embed = discord.Embed(title="Your Tasks")
+    embed.set_footer(text="Last Updated")
+    embed.timestamp = datetime.now()
+    # TODO: Make The Sorting And Filtering Of Tasks More Efficient
+    annotated_tasks = [(await get_due_datetime(t) or datetime.max, t.id, t) for t in tasks]
+    annotated_tasks.sort()
+    tasks = [t for key, ukey, t in annotated_tasks]
+    for task in tasks[:min(25, len(tasks))]:
+        if task.parent_id:
+            continue
+        v = f"`{task.id}`"
+        if due := await get_due_datetime(task):
+            v += f" | Due {discord.utils.format_dt(due, 'R')}"
+        v += f"\n{task.description}"
+        if subtasks := [st for st in tasks if st.parent_id == task.id]:
+            v += "\n\n**Sub-Tasks:**"
+            for subtask in subtasks:
+                v += f"\n- {subtask.content} | `[{subtask.id}]({subtask.url})"
+                if due := await get_due_datetime(subtask):
+                    v += f" | Due {discord.utils.format_dt(due, 'R')}"
+        embed.add_field(name=(task.content[:253] + "...") if len(task.content) > 256 else task.content, value=v,
+                        inline=False)
+    await ctx.respond(embed=embed)
 
 
 @bot.slash_command(

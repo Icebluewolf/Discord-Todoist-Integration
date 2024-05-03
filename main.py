@@ -4,25 +4,10 @@ from datetime import datetime
 
 from todoist_api_python.api_async import TodoistAPIAsync
 from todoist_api_python.models import Task
+from utils import get_due_datetime, get_task_info
 
 bot = discord.Bot()
 api = TodoistAPIAsync(os.getenv('todoist_token'))
-
-
-async def get_due_datetime(task: Task) -> datetime | None:
-    due = None
-    if task.due:
-        if task.due.datetime:
-            due = datetime.strptime(task.due.datetime, "%Y-%m-%dT%H:%M:%S")
-        elif task.due.date:
-            due = datetime.strptime(task.due.date, "%Y-%m-%d")
-            # Make It End Of Day
-            due = due.replace(hour=23, minute=59, second=59)
-        else:
-            # I dont think I want to handle this case as it should not happen.
-            # Either need to log a warning or do nothing, just not error
-            pass
-    return due
 
 
 class AddTaskOptions(discord.ui.View):
@@ -141,6 +126,27 @@ async def mark_as_todo(ctx: discord.ApplicationContext, message: discord.Message
         await ctx.respond(embed=await view.create_embed(), view=view)
     except Exception as error:
         await ctx.respond(error, ephemeral=True)
+
+
+async def tasks_autocomplete(ctx: discord.AutocompleteContext):
+    pass
+
+
+@bot.slash_command(
+    integration_types={discord.IntegrationType.user_install}
+)
+async def view_task(ctx: discord.ApplicationContext, task: discord.Option(str, description="The Task To View",
+                                                                          autocomplete=tasks_autocomplete)):
+    response = None
+    if task.isdigit():
+        response = await api.get_task(task)
+    elif response is None:
+        response = await api.get_tasks(label=task)
+
+    if response is None:
+        return await ctx.respond("No Tasks Found")
+
+    await ctx.respond(embed=await get_task_info(response))
 
 
 @bot.listen(name="on_ready", once=True)

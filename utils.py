@@ -8,10 +8,10 @@ from todoist_api_python.models import Task
 
 PRIORITY = {
     None: "Trivial",
-    1: "`` Normal",
-    2: "`` Medium",
-    3: "`` High",
-    4: "`` Urgent",
+    1: "`⚪` Normal",
+    2: "`🔵` Medium",
+    3: "`🟡` High",
+    4: "`‼️🔴` Urgent",
 }
 
 
@@ -53,13 +53,14 @@ async def remove_discord_jump(content: str) -> str:
 async def get_task_info(task: Task) -> discord.Embed:
     due = await get_due_datetime(task)
     title = await get_shortened(await remove_discord_jump(task.content), 100)
-    e = discord.Embed(title=title, description=await get_shortened(task.description, 1000), timestamp=datetime.now())
-    if due:
-        e.set_footer(text="Last Updated")
+    e = discord.Embed(title=title, description=f"`{task.id}`\n" + await get_shortened(task.description, 1000),
+                                                    timestamp=datetime.now(),
+                      color=56908, url=task.url)
+    e.set_footer(text="Last Updated")
 
-    due_display = (f"Due {format_dt(due, 'R')} {'Reoccuring' if task.due.is_recurring else ''}\n"
-                   f"{format_dt(due, 'f')}") if due else ""
-    due_display += f"Created: {format_dt(datetime.strptime(task.created_at, '%Y-%m-%dT%H:%M:%S.%fZ'), 'f')}"
+    due_display = (f"Due {format_dt(due, 'R')} {'Reoccurring' if task.due.is_recurring else ''}\n"
+                   f"{format_dt(due, 'f')}\n") if due else ""
+    due_display += f"Created: {format_dt(datetime.strptime(task.created_at, '%Y-%m-%dT%H:%M:%S.%fZ'), 'f')}\n"
     e.add_field(name="Dates", value=due_display, inline=False)
 
     ctgy_display = f"Parent: `{task.parent_id}`\n" if task.parent_id else ""
@@ -69,6 +70,6 @@ async def get_task_info(task: Task) -> discord.Embed:
 
     filter_display = PRIORITY[task.priority]
     filter_display += " | ".join(task.labels)
-    e.add_field(name="Filters", value="", inline=False)
+    e.add_field(name="Filters", value=filter_display, inline=False)
     return e
 

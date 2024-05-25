@@ -88,7 +88,7 @@ async def update(ctx: discord.ApplicationContext):
                     v += f" | Due {discord.utils.format_dt(due, 'R')}"
         embed.add_field(name=(task.content[:253] + "...") if len(task.content) > 256 else task.content, value=v,
                         inline=False)
-    await ctx.respond(embed=embed)
+    await ctx.respond(embed=embed, ephemeral=True)
 
 
 @bot.slash_command(
@@ -99,7 +99,7 @@ async def todo(ctx: discord.ApplicationContext, task: discord.Option(str, descri
     try:
         response = await api.add_task(content=task)
         view = AddTaskOptions(response)
-        await ctx.respond(embed=await view.create_embed(), view=view)
+        await ctx.respond(embed=await view.create_embed(), view=view, ephemeral=True)
     except Exception as error:
         await ctx.respond(error, ephemeral=True)
 
@@ -123,13 +123,13 @@ async def mark_as_todo(ctx: discord.ApplicationContext, message: discord.Message
     try:
         response = await api.add_task(content=short_msg)
         view = AddTaskOptions(response)
-        await ctx.respond(embed=await view.create_embed(), view=view)
+        await ctx.respond(embed=await view.create_embed(), view=view, ephemeral=True)
     except Exception as error:
         await ctx.respond(error, ephemeral=True)
 
 
 async def tasks_autocomplete(ctx: discord.AutocompleteContext):
-    pass
+    raise NotImplementedError("Function: tasks_autocomplete")
 
 
 @bot.slash_command(
@@ -144,9 +144,9 @@ async def view_task(ctx: discord.ApplicationContext, task: discord.Option(str, d
         response = await api.get_tasks(label=task)
 
     if response is None:
-        return await ctx.respond("No Tasks Found")
+        return await ctx.respond("No Tasks Found", ephemeral=True)
 
-    await ctx.respond(embed=await get_task_info(response))
+    await ctx.respond(embed=await get_task_info(response), ephemeral=True)
 
 
 @bot.listen(name="on_ready", once=True)

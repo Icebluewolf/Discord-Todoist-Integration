@@ -5,6 +5,7 @@ from datetime import datetime
 from todoist_api_python.api_async import TodoistAPIAsync
 from todoist_api_python.models import Task
 from utils import get_due_datetime, get_task_info
+from cooldowns import TaskAutocompleteCooldown
 
 bot = discord.Bot()
 api = TodoistAPIAsync(os.getenv('todoist_token'))
@@ -128,8 +129,19 @@ async def mark_as_todo(ctx: discord.ApplicationContext, message: discord.Message
         await ctx.respond(error, ephemeral=True)
 
 
+task_autocomplete_cooldown = TaskAutocompleteCooldown(seconds=15)
+
+
 async def tasks_autocomplete(ctx: discord.AutocompleteContext):
-    raise NotImplementedError("Function: tasks_autocomplete")
+    if await task_autocomplete_cooldown.can_execute(ctx.interaction.user.id):
+        print("Called API")
+        tasks = await api.get_tasks()
+        await task_autocomplete_cooldown.set_cache(ctx.interaction.user.id, tasks)
+    else:
+        tasks = await task_autocomplete_cooldown.get_cache(ctx.interaction.user.id)
+    task_names = [discord.OptionChoice(task.content, task.id) for task in tasks
+                  if task.content.lower().startswith(ctx.value.lower())]
+    return task_names[0:min(25, len(task_names))]
 
 
 @bot.slash_command(
@@ -142,6 +154,7 @@ async def view_task(ctx: discord.ApplicationContext, task: discord.Option(str, d
         response = await api.get_task(task)
     elif response is None:
         response = await api.get_tasks(label=task)
+        response = response[0]
 
     if response is None:
         return await ctx.respond("No Tasks Found", ephemeral=True)

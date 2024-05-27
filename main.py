@@ -1,7 +1,10 @@
+import asyncio
+
 import discord
 import os
 from datetime import datetime
 
+from discord import Interaction
 from todoist_api_python.api_async import TodoistAPIAsync
 from todoist_api_python.models import Task
 from utils import get_due_datetime, get_task_info
@@ -15,6 +18,7 @@ class AddTaskOptions(discord.ui.View):
     def __init__(self, task: Task, **kwargs):
         super().__init__(**kwargs)
         self.task = task
+        self.add_item(CompleteTask(task))
 
     @discord.ui.button(label="Add Info", style=discord.ButtonStyle.blurple)
     async def add_desc(self, button: discord.ui.Button, interaction: discord.Interaction):
@@ -59,6 +63,48 @@ class AddDesc(discord.ui.Modal):
         self.task.due = response.due
         await interaction.followup.edit_message(self.parent_view.message.id, embed=await
         self.parent_view.create_embed())
+
+
+class CompleteTask(discord.ui.Button):
+    def __init__(self, task: Task):
+        self.want_completed = False
+        self.completed = False
+        self.task = task
+        self.future = None
+        super().__init__(label="Complete", emoji="✅", style=discord.ButtonStyle.green)
+
+    async def mark_as_complete(self):
+        if self.completed:
+            return
+        await asyncio.sleep(5)
+        await api.close_task(self.task.id)
+        self.completed = True
+
+    async def mark_as_uncomplete(self):
+        if not self.completed:
+            return
+        await asyncio.sleep(5)
+        await api.reopen_task(self.task.id)
+        self.completed = False
+
+    async def callback(self, interaction: Interaction):
+        if self.future:
+            self.future.cancel()
+
+        if self.want_completed:
+            self.label = "Complete"
+            self.emoji = "✅"
+            self.style = discord.ButtonStyle.green
+            await interaction.edit(view=self.view)
+            self.want_completed = False
+            self.future = asyncio.ensure_future(self.mark_as_uncomplete())
+        else:
+            self.label = "Un-Complete"
+            self.emoji = "↩"
+            self.style = discord.ButtonStyle.red
+            await interaction.edit(view=self.view)
+            self.want_completed = True
+            self.future = asyncio.ensure_future(self.mark_as_complete())
 
 
 @bot.slash_command(
@@ -134,7 +180,6 @@ task_autocomplete_cooldown = TaskAutocompleteCooldown(seconds=15)
 
 async def tasks_autocomplete(ctx: discord.AutocompleteContext):
     if await task_autocomplete_cooldown.can_execute(ctx.interaction.user.id):
-        print("Called API")
         tasks = await api.get_tasks()
         await task_autocomplete_cooldown.set_cache(ctx.interaction.user.id, tasks)
     else:
@@ -159,7 +204,7 @@ async def view_task(ctx: discord.ApplicationContext, task: discord.Option(str, d
     if response is None:
         return await ctx.respond("No Tasks Found", ephemeral=True)
 
-    await ctx.respond(embed=await get_task_info(response), ephemeral=True)
+    await ctx.respond(embed=await get_task_info(response), view=AddTaskOptions(response), ephemeral=True)
 
 
 @bot.listen(name="on_ready", once=True)

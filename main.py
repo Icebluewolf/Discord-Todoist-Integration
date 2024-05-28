@@ -46,6 +46,8 @@ class AddDesc(discord.ui.Modal):
         self.add_item(discord.ui.InputText(label="Enter Due Date", required=False, placeholder="IE: tomorrow at "
                                                                                                "12:00",
                                            value=task.due.string if task.due else None))
+        self.add_item(discord.ui.InputText(label="Priority", required=False,
+                                           placeholder="Must Be A Number. 1: CRITICAL | 2: HIGH | 3: MEDIUM | 4: LOW"))
         self.task = task
         self.parent_view = view
 
@@ -56,11 +58,22 @@ class AddDesc(discord.ui.Modal):
         else:
             due_string = "no due date"
 
+        try:
+            priority = int(self.children[2].value)
+            if priority <= 0 or 5 <= priority:
+                priority = 1
+        except ValueError:
+            priority = 1
+        else:
+            # Reverse The Priority As The API Accepts 1 As Low Where The UI Shows 1 As High
+            priority = [4, 3, 2, 1][priority-1]
+
         response = await api.update_task(task_id=self.task.id, description=self.children[0].value.strip(),
-                                         due_string=due_string)
+                                         due_string=due_string, priority=priority)
         response = Task.from_dict(response)
         self.task.description = self.children[0].value.strip()
         self.task.due = response.due
+        self.task.priority = priority
         await interaction.followup.edit_message(self.parent_view.message.id, embed=await
         self.parent_view.create_embed())
 

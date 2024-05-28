@@ -24,20 +24,6 @@ class AddTaskOptions(discord.ui.View):
     async def add_desc(self, button: discord.ui.Button, interaction: discord.Interaction):
         await interaction.response.send_modal(AddDesc(self.task, self))
 
-    async def create_embed(self):
-        task_name = self.task.content if len(self.task.content) < 256 else (self.task.content[:253] + "...")
-        due = await get_due_datetime(self.task)
-        embed = discord.Embed(
-            description=f"**{task_name}**\n`{self.task.id}`"
-                        f"{(' | Due: ' + discord.utils.format_dt(due, 'R')) if due else ''}\n\n{self.task.description}",
-            color=56908,
-            timestamp=due,
-            url=self.task.url
-        )
-        embed.set_author(name="Task Created")
-        embed.set_footer(text="Due Date" if due else None)
-        return embed
-
 
 class AddDesc(discord.ui.Modal):
     def __init__(self, task: Task, view: AddTaskOptions):
@@ -74,8 +60,7 @@ class AddDesc(discord.ui.Modal):
         self.task.description = self.children[0].value.strip()
         self.task.due = response.due
         self.task.priority = priority
-        await interaction.followup.edit_message(self.parent_view.message.id, embed=await
-        self.parent_view.create_embed())
+        await interaction.followup.edit_message(self.parent_view.message.id, embed=await get_task_info(self.task))
 
 
 class CompleteTask(discord.ui.Button):
@@ -159,7 +144,7 @@ async def todo(ctx: discord.ApplicationContext, task: discord.Option(str, descri
     try:
         response = await api.add_task(content=task)
         view = AddTaskOptions(response)
-        await ctx.respond(embed=await view.create_embed(), view=view, ephemeral=True)
+        await ctx.respond(embed=await get_task_info(response), view=view, ephemeral=True)
     except Exception as error:
         await ctx.respond(error, ephemeral=True)
 
@@ -183,7 +168,7 @@ async def mark_as_todo(ctx: discord.ApplicationContext, message: discord.Message
     try:
         response = await api.add_task(content=short_msg)
         view = AddTaskOptions(response)
-        await ctx.respond(embed=await view.create_embed(), view=view, ephemeral=True)
+        await ctx.respond(embed=await get_task_info(response), view=view, ephemeral=True)
     except Exception as error:
         await ctx.respond(error, ephemeral=True)
 

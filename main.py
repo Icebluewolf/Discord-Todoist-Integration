@@ -15,8 +15,8 @@ api = TodoistAPIAsync(os.getenv('todoist_token'))
 
 
 class AddTaskOptions(discord.ui.View):
-    def __init__(self, task: Task, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, task: Task):
+        super().__init__(timeout=300, disable_on_timeout=True)
         self.task = task
         self.add_item(CompleteTask(task))
 
@@ -27,7 +27,7 @@ class AddTaskOptions(discord.ui.View):
 
 class AddDesc(discord.ui.Modal):
     def __init__(self, task: Task, view: AddTaskOptions):
-        super().__init__(title="Set Additional Info")
+        super().__init__(title="Set Additional Info", timeout=600)
         self.add_item(discord.ui.InputText(label="Enter Description", required=False, value=task.description))
         self.add_item(discord.ui.InputText(label="Enter Due Date", required=False, placeholder="IE: tomorrow at "
                                                                                                "12:00",

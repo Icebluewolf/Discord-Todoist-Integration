@@ -8,7 +8,7 @@ from discord import Interaction
 from todoist_api_python.api_async import TodoistAPIAsync
 from todoist_api_python.models import Task, Label
 from utils import get_due_datetime, get_task_info, LABEL_EMOJIS
-from cooldowns import TaskAutocompleteCooldown, LabelsCache
+from caches import TaskAutocompleteCooldown, LabelsCache
 
 bot = discord.Bot()
 api = TodoistAPIAsync(os.getenv("todoist_token"))

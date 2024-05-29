@@ -3,7 +3,7 @@ from datetime import datetime
 
 import discord
 from discord.utils import format_dt
-from todoist_api_python.models import Task
+from todoist_api_python.models import Task, Label
 
 
 PRIORITY = {
@@ -11,6 +11,29 @@ PRIORITY = {
     2: "`🔵` Medium",
     3: "`🟡` High",
     4: "`‼️🔴` Urgent",
+}
+
+LABEL_EMOJIS = {
+    "berry_red": "🍓",
+    "red": "🔴",
+    "orange": "🟠",
+    "yellow": "🟡",
+    "olive_green": "🫒",
+    "lime_green": "🎾",
+    "green": "🟢",
+    "mint_green": "🍵",
+    "teal": "🪼",
+    "sky_blue": "🏙",
+    "light_blue": "🩵",
+    "blue": "🔵",
+    "grape": "🍇",
+    "violet": "🟣",
+    "lavender": "🪻",
+    "magenta": "🩷",
+    "salmon": "🦩",
+    "charcoal": "⚫",
+    "gray": "🩶",
+    "taupe": "🟤",
 }
 
 
@@ -49,7 +72,13 @@ async def remove_discord_jump(content: str) -> str:
     return re.sub(r" \| \[Discord Jump]\(.+\)", "", content)
 
 
-async def get_task_info(task: Task) -> discord.Embed:
+async def get_label_object(target: str, labels: list[Label]) -> Label:
+    for label in labels:
+        if label.name == target:
+            return label
+
+
+async def get_task_info(task: Task, label_objects: list[Label]) -> discord.Embed:
     due = await get_due_datetime(task)
     title = await get_shortened(await remove_discord_jump(task.content), 100)
     e = discord.Embed(
@@ -80,6 +109,15 @@ async def get_task_info(task: Task) -> discord.Embed:
     e.add_field(name="Category", value=ctgy_display, inline=False)
 
     filter_display = PRIORITY[task.priority]
-    filter_display += " | ".join(task.labels)
+    labels: list[Label | str] = []
+    for label in task.labels:
+        obj = await get_label_object(label, label_objects)
+        if obj:
+            labels.append(obj)
+        else:
+            labels.append(label)
+    labels = [f"{LABEL_EMOJIS[label.color]} {label.name}" if isinstance(label, Label) else label for label in labels]
+    if labels:
+        filter_display += "\n**Labels:**\n" + " | ".join(labels)
     e.add_field(name="Filters", value=filter_display, inline=False)
     return e

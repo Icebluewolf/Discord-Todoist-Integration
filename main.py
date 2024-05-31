@@ -17,17 +17,38 @@ label_cache = LabelsCache(60, api)
 
 
 class AddTaskOptions(discord.ui.View):
-    def __init__(self, task: Task, labels: list[Label]):
+    def __init__(self, task: Task, labels: list[Label], parents: list[str] | None = None):
         super().__init__(timeout=300, disable_on_timeout=True)
         self.task = task
+        self.parents = parents or []
         self.add_item(CompleteTask(task))
         self.add_item(TaskLabeler(labels, task))
+
+        if len(self.parents) == 4:
+            self.children[1].disabled = True
 
     @discord.ui.button(label="Add Info", style=discord.ButtonStyle.blurple)
     async def add_desc(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         await interaction.response.send_modal(AddDesc(self.task, self))
+
+    @discord.ui.button(label="Add Sub-Task", style=discord.ButtonStyle.green)
+    async def add_subtask(self, button: discord.ui.Button, interaction: discord.Interaction):
+        modal = discord.ui.Modal(discord.ui.InputText(label="Task"), title="Add Sub-Task")
+
+        async def callback(modal_interaction: discord.Interaction):
+            await interaction.response.defer(ephemeral=True)
+            response = await api.add_task(modal.children[0].value, parent_id=self.task.id)
+            parents = self.parents.copy()
+            parents.append(self.task.id)
+            view = AddTaskOptions(response, await api.get_labels(), parents=parents)
+            await modal_interaction.respond(embed=await get_task_info(response, await label_cache.get_labels(
+                modal_interaction.user.id)), view=view, ephemeral=True)
+
+        modal.callback = callback
+        await interaction.response.send_modal(modal)
+
 
 
 class AddDesc(discord.ui.Modal):
@@ -231,7 +252,7 @@ async def todo(
     ctx: discord.ApplicationContext,
     task: discord.Option(str, description="The Task To Complete"),
 ):
-    await ctx.defer()
+    await ctx.defer(ephemeral=True)
     try:
         response = await api.add_task(content=task)
         view = AddTaskOptions(response, await api.get_labels())
@@ -257,7 +278,7 @@ async def mark_as_todo(ctx: discord.ApplicationContext, message: discord.Message
     # This Link Should Work For All Discord Messages On All Devices But It Is Not Guaranteed
     # TODO: The Jump URL Is Broken In The Current Dev Version Of Pycord
     short_msg += f"[Discord Jump]({message.jump_url})"
-    await ctx.defer()
+    await ctx.defer(ephemeral=True)
     try:
         response = await api.add_task(content=short_msg)
         view = AddTaskOptions(response, await api.get_labels())

@@ -113,10 +113,9 @@ async def get_task_info(task: Task, label_objects: list[Label]) -> discord.Embed
     for label in task.labels:
         obj = await get_label_object(label, label_objects)
         if obj:
-            labels.append(obj)
+            labels.append(f"{LABEL_EMOJIS[obj.color]} {obj.name}")
         else:
             labels.append(label)
-    labels = [f"{LABEL_EMOJIS[label.color]} {label.name}" if isinstance(label, Label) else label for label in labels]
     if labels:
         filter_display += "\n**Labels:**\n" + " | ".join(labels)
     e.add_field(name="Filters", value=filter_display, inline=False)

@@ -207,8 +207,9 @@ class TaskLabeler(discord.ui.Select):
 
 @bot.slash_command(
     integration_types={discord.IntegrationType.user_install},
+    description="View Upcoming Tasks"
 )
-async def update(ctx: discord.ApplicationContext):
+async def plan(ctx: discord.ApplicationContext):
     await ctx.defer()
     tasks = await api.get_tasks()
     embed = discord.Embed(title="Your Tasks")
@@ -219,18 +220,18 @@ async def update(ctx: discord.ApplicationContext):
         (await get_due_datetime(t) or datetime.max, t.id, t) for t in tasks
     ]
     annotated_tasks.sort()
-    tasks = [t for key, ukey, t in annotated_tasks]
+    tasks = [t for _, _, t in annotated_tasks]
     for task in tasks[: min(25, len(tasks))]:
         if task.parent_id:
             continue
         v = f"`{task.id}`"
         if due := await get_due_datetime(task):
             v += f" | Due {discord.utils.format_dt(due, 'R')}"
-        v += f"\n{task.description}"
+        v += f"\n{task.description}" if task.description else ""
         if subtasks := [st for st in tasks if st.parent_id == task.id]:
-            v += "\n\n**Sub-Tasks:**"
+            v += "\n**Sub-Tasks:**"
             for subtask in subtasks:
-                v += f"\n- {subtask.content} | `[{subtask.id}]({subtask.url})"
+                v += f"\n\t- {subtask.content} | `[{subtask.id}]({subtask.url})`"
                 if due := await get_due_datetime(subtask):
                     v += f" | Due {discord.utils.format_dt(due, 'R')}"
         embed.add_field(

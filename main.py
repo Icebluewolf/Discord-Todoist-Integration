@@ -39,7 +39,7 @@ class AddTaskOptions(discord.ui.View):
         modal = discord.ui.Modal(discord.ui.InputText(label="Task"), title="Add Sub-Task")
 
         async def callback(modal_interaction: discord.Interaction):
-            await interaction.response.defer(ephemeral=True)
+            await modal_interaction.response.defer(ephemeral=True)
             response = await api.add_task(modal.children[0].value, parent_id=self.task.id)
             parents = self.parents.copy()
             parents.append(self.task.id)

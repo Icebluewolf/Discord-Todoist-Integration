@@ -9,6 +9,7 @@ from todoist_api_python.api_async import TodoistAPIAsync
 from todoist_api_python.models import Task, Label
 from utils import get_due_datetime, get_task_info, LABEL_EMOJIS
 from caches import TaskAutocompleteCooldown, LabelsCache
+from plan_pages import create_pages
 
 bot = discord.Bot()
 api = TodoistAPIAsync(os.getenv("todoist_token"))
@@ -212,38 +213,8 @@ class TaskLabeler(discord.ui.Select):
 async def plan(ctx: discord.ApplicationContext):
     await ctx.defer()
     tasks = await api.get_tasks()
-    embed = discord.Embed(title="Your Tasks")
-    embed.set_footer(text="Last Updated")
-    embed.timestamp = datetime.now()
-    # TODO: Make The Sorting And Filtering Of Tasks More Efficient
-    annotated_tasks = [
-        (await get_due_datetime(t) or datetime.max, t.id, t) for t in tasks
-    ]
-    annotated_tasks.sort()
-    tasks = [t for _, _, t in annotated_tasks]
-    for task in tasks[: min(25, len(tasks))]:
-        if task.parent_id:
-            continue
-        v = f"`{task.id}`"
-        if due := await get_due_datetime(task):
-            v += f" | Due {discord.utils.format_dt(due, 'R')}"
-        v += f"\n{task.description}" if task.description else ""
-        if subtasks := [st for st in tasks if st.parent_id == task.id]:
-            v += "\n**Sub-Tasks:**"
-            for subtask in subtasks:
-                v += f"\n\t- {subtask.content} | `[{subtask.id}]({subtask.url})`"
-                if due := await get_due_datetime(subtask):
-                    v += f" | Due {discord.utils.format_dt(due, 'R')}"
-        embed.add_field(
-            name=(
-                (task.content[:253] + "...")
-                if len(task.content) > 256
-                else task.content
-            ),
-            value=v,
-            inline=False,
-        )
-    await ctx.respond(embed=embed, ephemeral=True)
+    paginator = await create_pages(tasks, await api.get_projects())
+    await paginator.respond(interaction=ctx.interaction, ephemeral=True)
 
 
 @bot.slash_command(

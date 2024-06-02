@@ -1,8 +1,27 @@
+from discord import Interaction
 from discord.ext import pages
 import discord
-from utils import get_due_datetime
+import asyncio
+from utils import get_due_datetime, get_shortened, get_task_info
 from datetime import datetime
 from todoist_api_python.models import Task, Project
+from initilization import label_cache, bot
+from views import AddTaskOptions
+
+
+class TaskSelector(discord.ui.Select):
+    def __init__(self, tasks: list[Task]):
+        self.tasks = {t.id: t for t in tasks}
+        options = [discord.SelectOption(label=t.content[:min(len(t.content), 100)],
+                                        value=t.id,
+                              description=t.description[:min(len(t.description), 100)]) for t in tasks]
+        super().__init__(placeholder="Select A Task For More Info", options=options)
+
+    async def callback(self, interaction: Interaction):
+        task = self.tasks[self.values[0]]
+        labels = await label_cache.get_labels(interaction.user.id)
+        await interaction.respond(embed=await get_task_info(task, labels), view=AddTaskOptions(task, labels),
+         ephemeral=True)
 
 
 async def create_pages(tasks: list[Task], project_obj: list[Project]) -> pages.Paginator:
@@ -54,8 +73,12 @@ async def create_pages(tasks: list[Task], project_obj: list[Project]) -> pages.P
 
     pgs = []
     for category, tasks in projects.items():
-        pgs.append(pages.PageGroup(label=category, pages=[await create_embed(tasks[i:i + 10]) for i in range(0,
-                                                                                                        len(tasks), 10
-                                                                                                       )]))
+        split_pages = [tasks[i:i + 10] for i in range(0, len(tasks), 10)]
+        complete_split_pages = []
+        for group in split_pages:
+            view = discord.ui.View()
+            view.add_item(TaskSelector(group))
+            complete_split_pages.append(pages.Page(embeds=[await create_embed(group)], custom_view=view))
+        pgs.append(pages.PageGroup(label=category, pages=complete_split_pages))
 
     return pages.Paginator(pages=pgs, show_menu=True, menu_placeholder="Project")

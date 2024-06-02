@@ -7,7 +7,9 @@ from initilization import api, label_cache
 
 
 class AddTaskOptions(discord.ui.View):
-    def __init__(self, task: Task, labels: list[Label], parents: list[str] | None = None):
+    def __init__(
+        self, task: Task, labels: list[Label], parents: list[str] | None = None
+    ):
         super().__init__(timeout=300, disable_on_timeout=True)
         self.task = task
         self.parents = parents or []
@@ -24,27 +26,42 @@ class AddTaskOptions(discord.ui.View):
         await interaction.response.send_modal(AddDesc(self.task, self))
 
     @discord.ui.button(label="Add Sub-Task", style=discord.ButtonStyle.green)
-    async def add_subtask(self, button: discord.ui.Button, interaction: discord.Interaction):
-        modal = discord.ui.Modal(discord.ui.InputText(label="Task"), title="Add Sub-Task")
+    async def add_subtask(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        modal = discord.ui.Modal(
+            discord.ui.InputText(label="Task"), title="Add Sub-Task"
+        )
 
         async def callback(modal_interaction: discord.Interaction):
             await modal_interaction.response.defer(ephemeral=True)
-            response = await api.add_task(modal.children[0].value, parent_id=self.task.id)
+            response = await api.add_task(
+                modal.children[0].value, parent_id=self.task.id
+            )
             parents = self.parents.copy()
             parents.append(self.task.id)
             view = AddTaskOptions(response, await api.get_labels(), parents=parents)
-            await modal_interaction.respond(embed=await get_task_info(response, await label_cache.get_labels(
-                modal_interaction.user.id)), view=view, ephemeral=True)
+            await modal_interaction.respond(
+                embed=await get_task_info(
+                    response, await label_cache.get_labels(modal_interaction.user.id)
+                ),
+                view=view,
+                ephemeral=True,
+            )
 
         modal.callback = callback
         await interaction.response.send_modal(modal)
+
 
 class AddDesc(discord.ui.Modal):
     def __init__(self, task: Task, view: AddTaskOptions):
         super().__init__(title="Set Additional Info", timeout=600)
         self.add_item(
             discord.ui.InputText(
-                label="Enter Description", required=False, value=task.description, style=discord.InputTextStyle.long
+                label="Enter Description",
+                required=False,
+                value=task.description,
+                style=discord.InputTextStyle.long,
             )
         )
         self.add_item(
@@ -60,12 +77,17 @@ class AddDesc(discord.ui.Modal):
                 label="Priority",
                 required=False,
                 placeholder="Must Be A Number. 1: CRITICAL | 2: HIGH | 3: MEDIUM | 4: LOW",
-                value=str([4, 3, 2, 1][task.priority - 1])
+                value=str([4, 3, 2, 1][task.priority - 1]),
             )
         )
-        self.add_item(discord.ui.InputText(label="Labels", required=False, placeholder="Comma Separated List Of "
-                                                                                       "Labels", value=", "
-                                                                                                       "".join(task.labels)))
+        self.add_item(
+            discord.ui.InputText(
+                label="Labels",
+                required=False,
+                placeholder="Comma Separated List Of " "Labels",
+                value=", " "".join(task.labels),
+            )
+        )
         self.task = task
         self.parent_view = view
 
@@ -93,7 +115,7 @@ class AddDesc(discord.ui.Modal):
             description=self.children[0].value.strip(),
             due_string=due_string,
             priority=priority,
-            labels=labels
+            labels=labels,
         )
         response = Task.from_dict(response)
         self.task.description = self.children[0].value.strip()
@@ -101,8 +123,10 @@ class AddDesc(discord.ui.Modal):
         self.task.priority = priority
         self.task.labels = labels
         await interaction.followup.edit_message(
-            self.parent_view.message.id, embed=await get_task_info(self.task, await label_cache.get_labels(
-                interaction.user.id))
+            self.parent_view.message.id,
+            embed=await get_task_info(
+                self.task, await label_cache.get_labels(interaction.user.id)
+            ),
         )
 
 
@@ -178,7 +202,11 @@ class TaskLabeler(discord.ui.Select):
             )
             for label in shown_labels
         ]
-        super().__init__(max_values=len(shown_labels), options=shown_labels, placeholder="Select Labels")
+        super().__init__(
+            max_values=len(shown_labels),
+            options=shown_labels,
+            placeholder="Select Labels",
+        )
 
     async def callback(self, interaction: discord.Interaction):
         await api.update_task(self.task.id, labels=self.values)
@@ -188,6 +216,9 @@ class TaskLabeler(discord.ui.Select):
             else:
                 option.default = False
         self.task.labels = self.values
-        await interaction.response.edit_message(embed=await get_task_info(self.task, await label_cache.get_labels(
-            interaction.user.id)),
-                                                view=self.view)
+        await interaction.response.edit_message(
+            embed=await get_task_info(
+                self.task, await label_cache.get_labels(interaction.user.id)
+            ),
+            view=self.view,
+        )

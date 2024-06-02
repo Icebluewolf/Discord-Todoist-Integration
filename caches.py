@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta
 
-from todoist_api_python.models import Task, Label
+from todoist_api_python.models import Label
 from todoist_api_python.api_async import TodoistAPIAsync
 
 

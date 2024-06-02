@@ -1,14 +1,6 @@
-import asyncio
-
 import discord
 import os
-from datetime import datetime
-
-from discord import Interaction
-from todoist_api_python.api_async import TodoistAPIAsync
-from todoist_api_python.models import Task, Label
-from utils import get_due_datetime, get_task_info, LABEL_EMOJIS
-from caches import TaskAutocompleteCooldown, LabelsCache
+from utils import get_task_info
 from plan_pages import create_pages
 from views import AddTaskOptions
 from initilization import bot, api, label_cache, task_autocomplete_cooldown
@@ -16,7 +8,7 @@ from initilization import bot, api, label_cache, task_autocomplete_cooldown
 
 @bot.slash_command(
     integration_types={discord.IntegrationType.user_install},
-    description="View Upcoming Tasks"
+    description="View Upcoming Tasks",
 )
 async def plan(ctx: discord.ApplicationContext):
     await ctx.defer()
@@ -37,7 +29,11 @@ async def todo(
         response = await api.add_task(content=task)
         view = AddTaskOptions(response, await api.get_labels())
         await ctx.respond(
-            embed=await get_task_info(response, await label_cache.get_labels(ctx.author.id)), view=view, ephemeral=True
+            embed=await get_task_info(
+                response, await label_cache.get_labels(ctx.author.id)
+            ),
+            view=view,
+            ephemeral=True,
         )
     except Exception as error:
         await ctx.respond(error, ephemeral=True)
@@ -63,11 +59,14 @@ async def mark_as_todo(ctx: discord.ApplicationContext, message: discord.Message
         response = await api.add_task(content=short_msg)
         view = AddTaskOptions(response, await api.get_labels())
         await ctx.respond(
-            embed=await get_task_info(response, await label_cache.get_labels(ctx.author.id)), view=view, ephemeral=True
+            embed=await get_task_info(
+                response, await label_cache.get_labels(ctx.author.id)
+            ),
+            view=view,
+            ephemeral=True,
         )
     except Exception as error:
         await ctx.respond(error, ephemeral=True)
-
 
 
 async def tasks_autocomplete(ctx: discord.AutocompleteContext):
@@ -81,7 +80,7 @@ async def tasks_autocomplete(ctx: discord.AutocompleteContext):
         for task in tasks
         if task.content.lower().startswith(ctx.value.lower())
     ]
-    return task_names[0 : min(25, len(task_names))]
+    return task_names[0: min(25, len(task_names))]
 
 
 @bot.slash_command(integration_types={discord.IntegrationType.user_install})
@@ -102,7 +101,9 @@ async def view_task(
         return await ctx.respond("No Tasks Found", ephemeral=True)
 
     await ctx.respond(
-        embed=await get_task_info(response, await label_cache.get_labels(ctx.author.id)),
+        embed=await get_task_info(
+            response, await label_cache.get_labels(ctx.author.id)
+        ),
         view=AddTaskOptions(response, await api.get_labels()),
         ephemeral=True,
     )

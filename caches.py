@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timedelta
+from time import monotonic
 
 from todoist_api_python.models import Label, Task
 from todoist_api_python.api_async import TodoistAPIAsync
@@ -14,9 +14,9 @@ class TaskAutocompleteCooldown:
 
     async def can_execute(self, user_id: int) -> bool:
         async with self.lock:
-            last_time = self.last_executed.get(user_id, datetime.min)
-            current_time = datetime.now()
-            if current_time - last_time >= timedelta(seconds=self.seconds):
+            last_time = self.last_executed.get(user_id, 0)
+            current_time = monotonic()
+            if current_time - last_time >= self.seconds:
                 self.last_executed[user_id] = current_time
                 return True
             return False
@@ -40,9 +40,9 @@ class LabelsCache:
 
     async def can_execute(self, user_id: int) -> bool:
         async with self.lock:
-            last_time = self.last_executed.get(user_id, datetime.min)
-            current_time = datetime.now()
-            if current_time - last_time >= timedelta(seconds=self.seconds):
+            last_time = self.last_executed.get(user_id, 0)
+            current_time = monotonic()
+            if current_time - last_time >= self.seconds:
                 self.last_executed[user_id] = current_time
                 return True
             return False
@@ -56,15 +56,15 @@ class LabelsCache:
 class TaskCache:
     def __init__(self, seconds: int, api: TodoistAPIAsync) -> None:
         self.seconds = seconds
-        self.last_executed = datetime.min
+        self.last_executed = 0
         self.lock = asyncio.Lock()
         self.tasks: list[Task] | None = None
         self.api = api
 
     async def can_execute(self) -> bool:
         async with self.lock:
-            current_time = datetime.now()
-            if current_time - self.last_executed >= timedelta(seconds=self.seconds):
+            current_time = monotonic()
+            if current_time - self.last_executed >= self.seconds:
                 self.last_executed = current_time
                 return True
             return False

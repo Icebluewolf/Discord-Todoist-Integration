@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta
 
-from todoist_api_python.models import Label
+from todoist_api_python.models import Label, Task
 from todoist_api_python.api_async import TodoistAPIAsync
 
 
@@ -51,3 +51,25 @@ class LabelsCache:
         if await self.can_execute(user_id):
             self.labels = await self.api.get_labels()
         return self.labels
+
+
+class TaskCache:
+    def __init__(self, seconds: int, api: TodoistAPIAsync) -> None:
+        self.seconds = seconds
+        self.last_executed = datetime.min
+        self.lock = asyncio.Lock()
+        self.tasks: list[Task] | None = None
+        self.api = api
+
+    async def can_execute(self) -> bool:
+        async with self.lock:
+            current_time = datetime.now()
+            if current_time - self.last_executed >= timedelta(seconds=self.seconds):
+                self.last_executed = current_time
+                return True
+            return False
+
+    async def get_tasks(self) -> list[Task]:
+        if await self.can_execute():
+            self.tasks = await self.api.get_tasks()
+        return self.tasks

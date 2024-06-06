@@ -3,18 +3,27 @@ from discord import Interaction
 from todoist_api_python.models import Task, Label
 import asyncio
 from utils import get_task_info, LABEL_EMOJIS
-from initilization import api, label_cache
+from initialization import api, label_cache
 
 
 class AddTaskOptions(discord.ui.View):
     def __init__(
-        self, task: Task, labels: list[Label], parents: list[str] | None = None
+        self,
+        task: Task,
+        labels: list[Label],
+        parents: list[str] | None = None,
+        subtasks: tuple[dict[str, dict], dict[str, Task]] = None,
     ):
         super().__init__(timeout=300, disable_on_timeout=True)
         self.task = task
         self.parents = parents or []
         self.add_item(CompleteTask(task))
         self.add_item(TaskLabeler(labels, task))
+        self.subtasks = subtasks or ({}, {})
+        if self.subtasks[0]:
+            self.add_item(
+                SubTaskSelector([self.subtasks[1][t] for t in self.subtasks[0].keys()])
+            )
 
         if len(self.parents) == 4:
             self.children[1].disabled = True
@@ -221,4 +230,31 @@ class TaskLabeler(discord.ui.Select):
                 self.task, await label_cache.get_labels(interaction.user.id)
             ),
             view=self.view,
+        )
+
+
+class SubTaskSelector(discord.ui.Select):
+    def __init__(self, subtasks: list[Task]):
+        self.subtasks = subtasks
+        options = [
+            discord.SelectOption(
+                label=t.content[: min(100, len(t.content))],
+                value=t.id,
+                description=t.description[: min(100, len(t.description))],
+            )
+            for t in subtasks
+        ]
+        super().__init__(placeholder="Select A Subtask For More Info", options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        selected = await api.get_task(self.values[0])
+        labels = await label_cache.get_labels(interaction.user.id)
+        parents = self.view.parents.copy()
+        parents.append(selected.id)
+        subtasks = (self.view.subtasks[0][selected.id], self.view.subtasks[1])
+        await interaction.respond(
+            embed=await get_task_info(selected, labels),
+            view=AddTaskOptions(selected, labels, parents=parents, subtasks=subtasks),
+            ephemeral=True,
         )

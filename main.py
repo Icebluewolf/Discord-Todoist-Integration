@@ -1,9 +1,9 @@
 import discord
 import os
-from utils import get_task_info
+from utils import get_task_info, get_subtasks_recursive
 from plan_pages import create_pages
 from views import AddTaskOptions
-from initilization import bot, api, label_cache, task_autocomplete_cooldown
+from initialization import bot, api, label_cache, task_autocomplete_cooldown, task_cache
 
 
 @bot.slash_command(
@@ -25,18 +25,15 @@ async def todo(
     task: discord.Option(str, description="The Task To Complete"),
 ):
     await ctx.defer(ephemeral=True)
-    try:
-        response = await api.add_task(content=task)
-        view = AddTaskOptions(response, await api.get_labels())
-        await ctx.respond(
-            embed=await get_task_info(
-                response, await label_cache.get_labels(ctx.author.id)
-            ),
-            view=view,
-            ephemeral=True,
-        )
-    except Exception as error:
-        await ctx.respond(error, ephemeral=True)
+    response = await api.add_task(content=task)
+    view = AddTaskOptions(response, await api.get_labels())
+    await ctx.respond(
+        embed=await get_task_info(
+            response, await label_cache.get_labels(ctx.author.id)
+        ),
+        view=view,
+        ephemeral=True,
+    )
 
 
 @bot.message_command(
@@ -104,7 +101,10 @@ async def view_task(
         embed=await get_task_info(
             response, await label_cache.get_labels(ctx.author.id)
         ),
-        view=AddTaskOptions(response, await api.get_labels()),
+        view=AddTaskOptions(response, await api.get_labels(), subtasks=await get_subtasks_recursive(response,
+                                                                                            await task_cache.get_tasks(
+
+                                                                                            ))),
         ephemeral=True,
     )
 

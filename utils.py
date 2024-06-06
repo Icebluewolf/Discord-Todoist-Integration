@@ -4,6 +4,7 @@ from datetime import datetime
 import discord
 from discord.utils import format_dt
 from todoist_api_python.models import Task, Label
+from initialization import task_cache
 
 
 PRIORITY = {
@@ -78,6 +79,37 @@ async def get_label_object(target: str, labels: list[Label]) -> Label:
             return label
 
 
+async def get_subtasks_recursive(parent: Task, tasks: list[Task]) -> tuple[dict[str, dict], dict[str, Task]]:
+    """
+    Recursively find all subtasks given a parent task.
+    Returns a table and a reference.
+    Table - dict with parent IDs as keys and subtasks in sub-dicts as values
+    Reference - dict with keys as task IDs and values of the task object.
+    :param parent:
+    :param tasks:
+    :return:
+    """
+    children = [t for t in tasks if t.parent_id == parent.id]
+    all_children: dict[str, dict] = {}
+    linked_children: dict[str, Task] = {}
+
+    for child in children:
+        table, reference = await get_subtasks_recursive(child, tasks)
+        all_children[child.id] = table
+        linked_children[child.id] = child
+        linked_children.update(reference)
+
+    return all_children, linked_children
+
+
+async def format_subtasks(subtasks: dict[str, dict], reference: dict[str, Task], level=0) -> str:
+    result = ""
+    for t_id, children in subtasks.items():
+        result += " " * level + await get_shortened(reference[t_id].content, 50) + "\n"
+        result += await format_subtasks(children, reference, level=level+1)
+    return result
+
+
 async def get_task_info(task: Task, label_objects: list[Label]) -> discord.Embed:
     due = await get_due_datetime(task)
     title = await get_shortened(await remove_discord_jump(task.content), 100)
@@ -119,4 +151,10 @@ async def get_task_info(task: Task, label_objects: list[Label]) -> discord.Embed
     if labels:
         filter_display += "\n**Labels:**\n" + " | ".join(labels)
     e.add_field(name="Filters", value=filter_display, inline=False)
+
+    # Subtasks
+    table, linked = await get_subtasks_recursive(task, await task_cache.get_tasks())
+    if table:
+        e.add_field(name="Subtasks", value=await format_subtasks(table, linked), inline=False)
+
     return e

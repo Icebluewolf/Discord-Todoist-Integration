@@ -1,10 +1,10 @@
 from discord import Interaction
 from discord.ext import pages
 import discord
-from utils import get_due_datetime, get_task_info
+from utils import get_due_datetime, get_task_info, get_subtasks_recursive
 from datetime import datetime
 from todoist_api_python.models import Task, Project
-from initilization import label_cache
+from initialization import label_cache, task_cache
 from views import AddTaskOptions
 
 
@@ -26,7 +26,9 @@ class TaskSelector(discord.ui.Select):
         labels = await label_cache.get_labels(interaction.user.id)
         await interaction.respond(
             embed=await get_task_info(task, labels),
-            view=AddTaskOptions(task, labels),
+            view=AddTaskOptions(task, labels, subtasks=await get_subtasks_recursive(task, await task_cache.get_tasks(
+
+            ))),
             ephemeral=True,
         )
 

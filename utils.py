@@ -33,7 +33,7 @@ LABEL_EMOJIS = {
     "magenta": "🩷",
     "salmon": "🦩",
     "charcoal": "⚫",
-    "gray": "🩶",
+    "grey": "🩶",
     "taupe": "🟤",
 }
 

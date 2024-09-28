@@ -1,5 +1,7 @@
 import discord
 import os
+
+import utils
 from utils import get_task_info, get_subtasks_recursive
 from plan_pages import create_pages
 from views import AddTaskOptions
@@ -73,7 +75,7 @@ async def tasks_autocomplete(ctx: discord.AutocompleteContext):
     else:
         tasks = await task_autocomplete_cooldown.get_cache(ctx.interaction.user.id)
     task_names = [
-        discord.OptionChoice(task.content, task.id)
+        discord.OptionChoice(await utils.get_shortened(task.content, 100), task.id)
         for task in tasks
         if task.content.lower().startswith(ctx.value.lower())
     ]

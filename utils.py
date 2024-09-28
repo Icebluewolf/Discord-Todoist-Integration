@@ -49,7 +49,7 @@ async def get_due_datetime(task: Task) -> datetime | None:
     due = None
     if task.due:
         if task.due.datetime:
-            due = datetime.strptime(task.due.datetime, "%Y-%m-%dT%H:%M:%S")
+            due = datetime.strptime(task.due.datetime.strip("Z"), "%Y-%m-%dT%H:%M:%S")
         elif task.due.date:
             due = datetime.strptime(task.due.date, "%Y-%m-%d")
             # Make It End Of Day
@@ -105,14 +105,14 @@ async def get_subtasks_recursive(parent: Task, tasks: list[Task]) -> tuple[dict[
 async def format_subtasks(subtasks: dict[str, dict], reference: dict[str, Task], level=0) -> str:
     result = ""
     for t_id, children in subtasks.items():
-        result += " " * level + await get_shortened(reference[t_id].content, 50) + "\n"
+        result += "  " * level + f"- {"✅ " if reference[t_id].is_completed else ""}{await get_shortened(reference[t_id].content, 50)}\n"
         result += await format_subtasks(children, reference, level=level+1)
     return result
 
 
 async def get_task_info(task: Task, label_objects: list[Label]) -> discord.Embed:
     due = await get_due_datetime(task)
-    title = await get_shortened(await remove_discord_jump(task.content), 100)
+    title = f"{"✅" if task.is_completed else ""} {await get_shortened(await remove_discord_jump(task.content), 100)}"
     e = discord.Embed(
         title=title,
         description=f"`{task.id}`\n" + await get_shortened(task.description, 1000),
@@ -125,7 +125,7 @@ async def get_task_info(task: Task, label_objects: list[Label]) -> discord.Embed
     due_display = (
         (
             f"Due {format_dt(due, 'R')} {'Reoccurring' if task.due.is_recurring else ''}\n"
-            f"{format_dt(due, 'f')}\n"
+            f"    {format_dt(due, 'f')}\n"
         )
         if due
         else ""
